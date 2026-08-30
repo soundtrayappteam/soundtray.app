@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension"
+     xmlns:ui="http://schemas.microsoft.com/wix/UIExtension">
+  <Product Id="*" Name="Sound Tray 64-bit" Language="1033"
+           Version="!(bind.FileVersion.File_SoundTrayExe)"
+           Manufacturer="The Sound Tray Team"
+           UpgradeCode="E9B8C7D6-5A4F-4321-9E8D-7C6B5A4F3E2D">
+    <Package Description="Installs SoundTray Application"
+             Comments="(c) 2026 The SoundTray Team"
+             InstallerVersion="200"
+             Compressed="yes"
+             Platform="x64" />
+
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <Media Id="1" Cabinet="SoundTray.cab" EmbedCab="yes" />
+
+    <Property Id="PromptToCloseProcesses" Value="SoundTray" />
+    <Property Id="PromptToCloseDisplayNames" Value="SoundTray" />
+
+    <!-- Directories -->
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="DesktopFolder" Name="Desktop" />
+
+      <!-- 64-bit Program Files folder -->
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLDIR" Name="SoundTray" />
+        <Directory Id="ProgramMenuFolder">
+          <Directory Id="ApplicationProgramsFolder" Name="SoundTray" />
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <!-- UI variables -->
+    <WixVariable Id="WixUIBannerBmp" Value="..\SoundTray\SoundTray Shared Resources\SoundTrayInstallerBanner.png" />
+    <WixVariable Id="WixUIDialogBmp" Value="..\SoundTray\SoundTray Shared Resources\SoundTrayInstallerPic.png" />
+    <WixVariable Id="WixUILicenseRtf" Value="..\SoundTray\SoundTray Shared Resources\SoundTrayLicense.rtf" />
+
+    <!-- Icon -->
+    <Icon Id="SoundTray.ico" SourceFile="..\SoundTray\SoundTray Shared Resources\SoundTray.ico" />
+
+    <!-- 64-bit components group (INSTALLDIR under ProgramFiles64Folder) -->
+    <ComponentGroup Id="ProductComponents_x64" Directory="INSTALLDIR">
+      <Component Id="Comp_SoundTrayEmptyFolder" Guid="58F6A9C2-3D7B-4E1A-9C2F-6B2D7A4C8E9F" Win64="yes">
+        <CreateFolder>
+          <util:PermissionEx User="Users" GenericAll="yes" />
+        </CreateFolder>
+      </Component>
+
+      <Component Id="Comp_NAudio" Guid="3A9D1E2C-4B5F-4678-923A-0B1C2D3E4F50" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_dll" Name="NAudio.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.dll" />
+      </Component>
+
+      <Component Id="Comp_NAudio_Core" Guid="2A4B6C8D-9E0F-41A2-B3C4-D5E6F7A89012" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_Core" Name="NAudio.Core.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.Core.dll" />
+      </Component>
+
+      <Component Id="Comp_NAudio_Midi" Guid="3B5C7D9E-0F1A-42B3-C4D5-E6F708A91234" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_Midi" Name="NAudio.Midi.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.Midi.dll" />
+      </Component>
+
+      <Component Id="Comp_NAudio_Wasapi" Guid="4C6D8E0F-1A2B-43C4-D5E6-F7091A234567" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_Wasapi" Name="NAudio.Wasapi.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.Wasapi.dll" />
+      </Component>
+
+      <Component Id="Comp_NAudio_WinForms_x64" Guid="A7E2C9F4-3B6D-4F8A-9C2E-1D3B5A6F7E80" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_WinForms_x64" Name="NAudio.WinForms.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.WinForms.dll" />
+      </Component>
+
+      <Component Id="Comp_NAudio_WinMM" Guid="6E801F21-3C4D-45E6-F709-12A3B4567890" DiskId="1" Win64="yes">
+        <File Id="File_NAudio_WinMM" Name="NAudio.WinMM.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\NAudio.WinMM.dll" />
+      </Component>
+
+      <Component Id="Comp_Computer_Font" Guid="A1B2C3D4-E5F6-4789-ABCD-12345678ABCD" DiskId="1" Win64="yes">
+        <File Id="File_Computer_Font" Name="Computer.ttf" Source="..\SoundTray\SoundTray Shared Resources\Computer.ttf" />
+      </Component>
+
+      <Component Id="Comp_SoundTrayExe" Guid="9F8E7D6C-5B4A-4321-0FED-CBA987654321" DiskId="1" Win64="yes">
+        <File Id="File_SoundTrayExe" Name="SoundTray.exe" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\SoundTray.exe">
+          <Permission User="Users" GenericAll="yes" />
+          <util:PermissionEx User="Users" Domain="[LOCAL_MACHINE_NAME]" GenericAll="yes" ChangePermission="yes" />
+        </File>
+      </Component>
+
+      <Component Id="Comp_SoundTray_Ico" Guid="2B3C4D5E-6F70-4A3B-9C8D-1E2F3A4B5C6D" DiskId="1" Win64="yes">
+        <File Id="File_SoundTray_Ico" Name="SoundTray.ico" Source="..\SoundTray\SoundTray Shared Resources\SoundTray.ico" />
+      </Component>
+
+      <Component Id="Comp_SoundTrayDll" Guid="C1D2E3F4-A5B6-4789-8C7D-6E5F4A3B2C1D" DiskId="1" Win64="yes">
+        <File Id="File_SoundTrayDll" Name="SoundTray.dll" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\SoundTray.dll" />
+      </Component>
+
+      <Component Id="Comp_SoundTrayRuntimeConfig" Guid="D0C1B2A3-4F5E-4789-8A7B-6C5D4E3F2A1B" DiskId="1" Win64="yes">
+        <File Id="File_SoundTrayRuntimeConfig" Name="SoundTray.runtimeconfig.json" Source="..\SoundTray\bin\x64\Release\net10.0-windows7.0\SoundTray.runtimeconfig.json" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Desktop shortcut & registry (placed in DesktopFolder).
+         ICE38 requires a per-user component KeyPath under HKCU, not a file. -->
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="Comp_DesktopShortcut" Guid="5A6B7C8D-9E0F-4A1B-8C2D-3E4F5A6B7C8E">
+        <!-- HKCU registry value used as the component KeyPath to satisfy ICE38 -->
+        <RegistryValue Root="HKCU"
+                       Key="Software\The SoundTray Team\SoundTray\Shortcuts"
+                       Name="DesktopInstalled"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+        <Shortcut Id="SoundTrayDesktopShortCut"
+                  Directory="DesktopFolder"
+                  Name="SoundTray"
+                  Target="[#File_SoundTrayExe]"
+                  WorkingDirectory="INSTALLDIR"
+                  Icon="SoundTray.ico"
+                  IconIndex="0" />
+        <RemoveFolder Id="DesktopFolder" On="uninstall" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Start menu shortcuts (placed in ApplicationProgramsFolder) -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="Comp_ApplicationShortcuts" Guid="E1F2D3C4-B5A6-4789-9ABC-DEF012345679" Win64="yes">
+        <Shortcut Id="ApplicationStartMenuShortcut" Name="SoundTray" Description="SoundTray" Target="[#File_SoundTrayExe]" WorkingDirectory="INSTALLDIR" />
+        <Shortcut Id="UninstallProduct" Name="Uninstall SoundTray" Description="Uninstalls SoundTray" Target="[System64Folder]msiexec.exe" Arguments="/x [ProductCode]" />
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\The SoundTray Team\SoundTray" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- Feature -->
+    <Feature Id="MainApplication" Title="Main Application" Level="1">
+      <ComponentGroupRef Id="ProductComponents_x64" />
+      <ComponentRef Id="Comp_DesktopShortcut" />
+      <ComponentRef Id="Comp_ApplicationShortcuts" />
+    </Feature>
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+    <UIRef Id="WixUI_InstallDir" />
+  </Product>
+
+  <!-- Fragment: CustomAction binary -->
+  <Fragment>
+    <Binary Id="ClosePromptBinary" SourceFile="..\ClosePromptCA.CA.dll" />
+    <CustomAction Id="CloseAppsPrompt" BinaryKey="ClosePromptBinary" DllEntry="ClosePrompt" Return="check" />
+    <InstallUISequence>
+      <Show Dialog="InstallDlg" After="ExecuteAction" />
+    </InstallUISequence>
+    <AdminUISequence>
+      <Show Dialog="InstallDlg" After="ExecuteAction" />
+    </AdminUISequence>
+  </Fragment>
+</Wix>
