@@ -4,6 +4,7 @@
     using SoundTray.Properties;
     using SoundTray.SoundModels;
     using System;
+    using System.Diagnostics;
     using System.Drawing;
     using System.Windows.Forms;
 
@@ -28,6 +29,7 @@
         private Bitmap defaultAudioInputImage = Resources.Microphone.ToBitmap();
         private Bitmap greenTickImage = Resources.GreenTick.ToBitmap();
 
+        private System.Windows.Forms.Timer? deviceChangeDetectionTimer;
 
         string startupPath = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
         string appName = Path.GetFileNameWithoutExtension(Application.ExecutablePath);
@@ -68,6 +70,34 @@
             NotifyIcon.BalloonTipTitle = "Sound Tray";
             NotifyIcon.BalloonTipText = "To always show this icon, right-click the taskbar, choose 'Taskbar settings', then 'Select which icons appear on the taskbar'.";
             NotifyIcon.ShowBalloonTip(5000);
+
+            // Initialize device change detection timer to refresh cache periodically
+            InitializeDeviceChangeDetection();
+        }
+
+        /// <summary>
+        /// Initializes a timer to periodically check for audio device changes
+        /// </summary>
+        private void InitializeDeviceChangeDetection()
+        {
+            deviceChangeDetectionTimer = new System.Windows.Forms.Timer();
+            deviceChangeDetectionTimer.Interval = 5000; // Check every 5 seconds
+            deviceChangeDetectionTimer.Tick += (sender, e) =>
+            {
+                // This will trigger a cache validation and refresh if devices changed
+                var currentInputDevices = SoundTrayStatus.GetAudioInputDevices();
+                var currentOutputDevices = SoundTrayStatus.GetAudioOutputDevices();
+
+                // Check if device list has changed
+                if (!AudioInputDevicesCache.SequenceEqual(currentInputDevices, comparer) ||
+                    !AudioOutputDevicesCache.SequenceEqual(currentOutputDevices, comparer))
+                {
+                    // Devices changed, refresh the context menu next time it's shown
+                    Debug.WriteLine("Audio device changes detected, cache will be refreshed on next menu show.");
+                    SoundTrayStatus.InvalidateDeviceCache();
+                }
+            };
+            deviceChangeDetectionTimer.Start();
         }
 
         /// <summary>
@@ -75,11 +105,18 @@
         /// </summary>
         public static void GetDefaultAudioDevices()
         {
-            var enumerator = new MMDeviceEnumerator();
-            var defaultAudioInputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-            var defaultAudioOutputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
-            DefaultAudioInputDeviceCache = new AudioDevice() { ID = defaultAudioInputDevice.ID, FriendlyName = defaultAudioInputDevice.FriendlyName };
-            DefaultAudioOutputDeviceCache = new AudioDevice() { ID = defaultAudioOutputDevice.ID, FriendlyName = defaultAudioOutputDevice.FriendlyName };
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                var defaultAudioInputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                var defaultAudioOutputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+                DefaultAudioInputDeviceCache = new AudioDevice() { ID = defaultAudioInputDevice.ID, FriendlyName = defaultAudioInputDevice.FriendlyName };
+                DefaultAudioOutputDeviceCache = new AudioDevice() { ID = defaultAudioOutputDevice.ID, FriendlyName = defaultAudioOutputDevice.FriendlyName };
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting default audio devices: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -109,6 +146,13 @@
         /// <param name="e"></param>
         public void Exit(object sender, EventArgs e)
         {
+            // Clean up device change detection timer
+            if (deviceChangeDetectionTimer != null)
+            {
+                deviceChangeDetectionTimer.Stop();
+                deviceChangeDetectionTimer.Dispose();
+            }
+
             NotifyIcon.Visible = false;
             NotifyIcon.Icon = null;
             NotifyIcon.Dispose();
@@ -131,32 +175,43 @@
         {
             SoundTrayStatus.LoadSettings();
 
-            // get the filtered audio devices into a list
+            // Get the filtered audio devices into a list (with caching enabled)
             var audioInputDevices = SoundTrayStatus.GetAudioInputDevices();
-
-            // get all the audio devices into a list
             var audioOutputDevices = SoundTrayStatus.GetAudioOutputDevices();
 
-            // check if the cache is exactly equal
-            var enumerator = new MMDeviceEnumerator();
+            // Consolidate enumerator usage - use single instance for default device retrieval
+            MMDevice? defaultAudioInputDevice = null;
+            MMDevice? defaultAudioOutputDevice = null;
 
-            var defaultAudioInputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-            var defaultAudioOutputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+            try
+            {
+                using var enumerator = new MMDeviceEnumerator();
+                defaultAudioInputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+                defaultAudioOutputDevice = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Console);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error getting default audio endpoints: {ex.Message}");
+            }
 
-            // next check if the input devices list are exactly equal to the cache
+            // Check if the input devices list are exactly equal to the cache
             var areAudioInputDeviceListsExactlyEqual = AudioInputDevicesCache.SequenceEqual(audioInputDevices, comparer);
 
-            // next check if the output devices list are exactly equal to the cache
+            // Check if the output devices list are exactly equal to the cache
             var areAudioOutputDeviceListsExactlyEqual = AudioOutputDevicesCache.SequenceEqual(audioOutputDevices, comparer);
 
             var isSoundTrayEnabledEqualToStartupCache = isWindowsStartUpEnabled != IsSoundTrayInWindowsStartUp(shortcutPath);
 
-            NotifyIcon.ContextMenuStrip?.Items.Clear();
-
-            // if the cache count doesn't match the existing count, we know there is a difference
-            if (!isSoundTrayEnabledEqualToStartupCache || !areAudioInputDeviceListsExactlyEqual || !areAudioOutputDeviceListsExactlyEqual || DefaultAudioInputDeviceCache.FriendlyName != defaultAudioInputDevice.FriendlyName || DefaultAudioOutputDeviceCache.FriendlyName != defaultAudioOutputDevice.FriendlyName)
+            // Only clear and rebuild if something changed
+            if (!isSoundTrayEnabledEqualToStartupCache || !areAudioInputDeviceListsExactlyEqual || !areAudioOutputDeviceListsExactlyEqual || 
+                (defaultAudioInputDevice != null && DefaultAudioInputDeviceCache.FriendlyName != defaultAudioInputDevice.FriendlyName) || 
+                (defaultAudioOutputDevice != null && DefaultAudioOutputDeviceCache.FriendlyName != defaultAudioOutputDevice.FriendlyName))
             {
-                UpdateContextMenu(areAudioInputDeviceListsExactlyEqual, areAudioOutputDeviceListsExactlyEqual, audioInputDevices, audioOutputDevices, defaultAudioInputDevice, defaultAudioOutputDevice);
+                NotifyIcon.ContextMenuStrip?.Items.Clear();
+                if (defaultAudioInputDevice != null && defaultAudioOutputDevice != null)
+                {
+                    UpdateContextMenu(areAudioInputDeviceListsExactlyEqual, areAudioOutputDeviceListsExactlyEqual, audioInputDevices, audioOutputDevices, defaultAudioInputDevice, defaultAudioOutputDevice);
+                }
             }
 
             NotifyIcon.ContextMenuStrip = SoundTrayContextMenuStrip;

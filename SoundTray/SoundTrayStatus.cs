@@ -11,6 +11,14 @@ namespace SoundTray
     /// </summary>
     public partial class SoundTrayStatus : Form
     {
+        // Device enumeration cache with timestamps
+        private static List<AudioDevice>? _cachedInputDevices;
+        private static List<AudioDevice>? _cachedOutputDevices;
+        private static DateTime _lastInputDeviceEnumeration = DateTime.MinValue;
+        private static DateTime _lastOutputDeviceEnumeration = DateTime.MinValue;
+        private static readonly object _cacheLock = new object();
+        private const int CACHE_DURATION_MS = 2000; // Cache device list for 2 seconds
+
         public SoundTrayStatus()
         {
             InitializeComponent();
@@ -24,27 +32,79 @@ namespace SoundTray
         }
 
         /// <summary>
-        /// Gets a list of all audio input devices
+        /// Gets a list of all audio input devices with caching to reduce enumeration calls
         /// </summary>
-        /// <returns></returns>
         public static List<AudioDevice> GetAudioInputDevices()
         {
-            // Create an MMDeviceEnumerator instance
-            using var enumerator = new MMDeviceEnumerator();
-            // Enumerate active render (output) devices
-            return enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active).Select(a => new AudioDevice() { ID = a.ID, FriendlyName = a.FriendlyName }).ToList();
+            lock (_cacheLock)
+            {
+                var now = DateTime.UtcNow;
+                if (_cachedInputDevices != null && (now - _lastInputDeviceEnumeration).TotalMilliseconds < CACHE_DURATION_MS)
+                {
+                    return _cachedInputDevices;
+                }
+
+                try
+                {
+                    using var enumerator = new MMDeviceEnumerator();
+                    _cachedInputDevices = enumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active)
+                        .Select(a => new AudioDevice() { ID = a.ID, FriendlyName = a.FriendlyName })
+                        .ToList();
+                    _lastInputDeviceEnumeration = now;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error enumerating input devices: {ex.Message}");
+                    _cachedInputDevices ??= new List<AudioDevice>();
+                }
+
+                return _cachedInputDevices;
+            }
         }
 
         /// <summary>
-        /// Gets a list of audio output devices
+        /// Gets a list of audio output devices with caching to reduce enumeration calls
         /// </summary>
-        /// <returns></returns>
         public static List<AudioDevice> GetAudioOutputDevices()
         {
-            // Create an MMDeviceEnumerator instance
-            using var enumerator = new MMDeviceEnumerator();
-            // Enumerate active render (output) devices
-            return enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active).Select(a => new AudioDevice() { ID = a.ID, FriendlyName = a.FriendlyName }).ToList();
+            lock (_cacheLock)
+            {
+                var now = DateTime.UtcNow;
+                if (_cachedOutputDevices != null && (now - _lastOutputDeviceEnumeration).TotalMilliseconds < CACHE_DURATION_MS)
+                {
+                    return _cachedOutputDevices;
+                }
+
+                try
+                {
+                    using var enumerator = new MMDeviceEnumerator();
+                    _cachedOutputDevices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active)
+                        .Select(a => new AudioDevice() { ID = a.ID, FriendlyName = a.FriendlyName })
+                        .ToList();
+                    _lastOutputDeviceEnumeration = now;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error enumerating output devices: {ex.Message}");
+                    _cachedOutputDevices ??= new List<AudioDevice>();
+                }
+
+                return _cachedOutputDevices;
+            }
+        }
+
+        /// <summary>
+        /// Invalidates the device cache to force refresh on next enumeration
+        /// </summary>
+        public static void InvalidateDeviceCache()
+        {
+            lock (_cacheLock)
+            {
+                _cachedInputDevices = null;
+                _cachedOutputDevices = null;
+                _lastInputDeviceEnumeration = DateTime.MinValue;
+                _lastOutputDeviceEnumeration = DateTime.MinValue;
+            }
         }
 
         /// <summary>
@@ -82,6 +142,8 @@ namespace SoundTray
 
                         policyConfig.SetDefaultEndpoint(audioDevice.ID, eRole);
 
+                        // Invalidate the device cache since default device has changed
+                        InvalidateDeviceCache();
                         PopulateInputAndOutputDevicesGrid();
                     }
                 }
